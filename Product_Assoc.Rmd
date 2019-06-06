@@ -1,0 +1,92 @@
+---
+title: "Product_Association"
+author: "Zen"
+date: "June 6, 2019"
+output: github_document
+ # html_document: 
+ #  keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r Prod_Assoc}
+library (arules)             # Is a package for analyzing transactional data.
+library (arulesViz)          # Is a package that provides visual techniques for the arules package
+library (caTools)
+library(ggplot2)
+library (gridExtra)
+
+frmtdata <- read.transactions ("C:/Users/Zenin Kurunthottical/Desktop/UT_DA_R_Studio_Projects/C2T4/ElectronidexTransactions2017.csv", format = "basket", sep=",", rm.duplicates=FALSE)
+#inspect (frmtdata)     # view the transactions
+length (frmtdata)       # Number of transactions
+size (frmtdata)         # Number of items per transaction
+#LIST (frmtdata)
+LIST (frmtdata[1:5])
+itemLabels(frmtdata)    # To see the item labels or the total number of items
+summary (frmtdata)      # gives density (0.03506172) min, median, mean and max (median is good for skewed                                  # distribution while mean is good for normal distributions)
+                        # 9835 x 125 = 1,229,375 positions in the matrix (1,229,375 x 0.03506172 = 43,104 items                            # were purchased assuming 
+                        # no duplicates were purchased for the 30 days worth of data)
+str(frmtdata)
+
+basketSizes <- size (frmtdata)    #see sizes funtion above
+summary (basketSizes)
+quantile (basketSizes, probs=seq(0, 1, 0.1))     # examining size distribution
+#dev.off()                                   # had to add this to make plotting work
+ggplot (data.frame (count = basketSizes)) + geom_density(aes(x=count), binwidth=1, fill="blue", colour=NA, alpha=0.2) + scale_x_log10()
+
+itemFrequencyPlot(frmtdata, support=0.10)   # shows the number of items with at least 10% support or "likeability")
+
+itemFrequencyPlot(frmtdata, type="relative", topN = 15) # shows the top 10 items and their frequency(%)
+itemFrequencyPlot(frmtdata, type="absolute", topN = 15) # shows the top 10 items and their frequency(absolute numbers)
+
+
+image (frmtdata[1:125])                 # sparse matrix visualization of all 125 items (columns/Items = x, rows/trx = y)
+image (sample(frmtdata, 64))            # sparse matrix visualization for a randomly sampled set of trxs (64 in this case)
+image (frmtdata[1:100, 1:50])           # sparse matrix visualization of 50 items with 100 trxs
+
+AP_10_80 <- apriori (frmtdata, parameter = list(supp = 0.01,    # support measures itemsets or rules freq. within your trx data
+                                                conf = 0.5,
+                                                minlen = 1))   # confidence measures accuracy of the rules
+
+inspect (AP_10_80)
+summary (AP_10_80)
+
+inspect (sort (AP_10_80, by = "support"))    # sorts the apriori rules by the measure you specify (confidence, support or lift)
+
+inspect (sort (AP_10_80, by = "confidence"))    # sorts the apriori rules by the measure you specify (confidence, support or lift)
+
+inspect (sort (AP_10_80, by = "lift"))    # sorts the apriori rules by the measure you specify (confidence, support or lift)
+
+
+ViewSonicSubset <- subset (AP_10_80, items %in% "ViewSonic Monitor", "Lenovo Desktop Computer")    #creating a subset of the original apriori rules list
+
+inspect (ViewSonicSubset)  #viewing the subset list
+
+is.redundant(AP_10_80)     #check to see if you have redundant rules (TRUE), if so, then additional measures (ex. pruning) may need to be applied
+
+#?plot
+
+plot (AP_10_80[1:19], method = "graph", control = list (type = "items"))    #plots the apriori rules as a graph mapping diagram to visualize links
+
+plot(AP_10_80)
+
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
