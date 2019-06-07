@@ -2,7 +2,7 @@
 title: "Time_Series_Energy_Consumption"
 author: "Zen"
 date: "June 6, 2019"
-always_allow_html: yes
+#always_allow_html: yes
 output: github_document
    
 ---
@@ -210,75 +210,6 @@ housemonth <- filter(yrs_primaryDF, year == 2010 & month == 4)
 ## Plot subset houseWeek
 plot(housemonth$Sub_metering_1)
 
-## Subset the 9th day of January 2008 - All observations  (grainy with 1440 points)
-houseDay <- filter(yrs_primaryDF, year == 2008 & month == 1 & day == 9)
-## Plot sub-meter 1
-plot_ly(houseDay, x = ~houseDay$DateTime, y = ~houseDay$Sub_metering_1, type = 'scatter', mode = 'lines')
-
-
-## Plot sub-meter 1, 2 and 3 with title, legend and labels - All observations 
-plot_ly(houseDay, x = ~houseDay$DateTime, y = ~houseDay$Sub_metering_1, name = 'Kitchen', type = 'scatter', mode = 'lines') %>%  
-  add_trace(y = ~houseDay$Sub_metering_2, name = 'Laundry Room', mode = 'lines') %>%
-  add_trace(y = ~houseDay$Sub_metering_3, name = 'Water Heater & AC', mode = 'lines') %>%
-  layout(title = "Power Consumption January 9th, 2008",
-         xaxis = list(title = "Time"),
-         yaxis = list (title = "Power (watt-hours)"))
-
-## Subset the 9th day of January 2008 - 10 Minute frequency  
-houseDay10 <- filter(yrs_primaryDF, year == 2008 & month == 1 & day == 9 & (minute == 0 | minute == 10 | minute == 20 | 
-                                                                              minute == 30 | minute == 40 | minute == 50))
-## Plot sub-meter 1, 2 and 3 with title, legend and labels - 10 Minute frequency
-plot_ly(houseDay10, x = ~houseDay10$DateTime, y = ~houseDay10$Sub_metering_1, name = 'Kitchen', type = 'scatter', mode = 'lines') %>%
-  add_trace(y = ~houseDay10$Sub_metering_2, name = 'Laundry Room', mode = 'lines') %>%
-  add_trace(y = ~houseDay10$Sub_metering_3, name = 'Water Heater & AC', mode = 'lines') %>%
-  layout(title = "Power Consumption January 9th, 2008",
-         xaxis = list(title = "Time"),
-         yaxis = list (title = "Power (watt-hours)"))
-		 
-#Produce the same visualizations as "Day" above but now do it with a week
-
-## Subset the 44th week of 2008 - All Observations (x axis is # of minutes) 
-houseWeek44 <- filter(yrs_primaryDF, year == 2008 & month == 10 & week == 44)
-
-plot_ly(houseWeek44, x = ~houseWeek44$DateTime, y = ~houseWeek44$Sub_metering_1, name = 'Kitchen', type = 'scatter', mode = 'lines') %>%
-  add_trace(y = ~houseWeek44$Sub_metering_2, name = 'Laundry Room', mode = 'lines') %>%
-  add_trace(y = ~houseWeek44$Sub_metering_3, name = 'Water Heater & AC', mode = 'lines') %>%
-  layout(title = "Power Consumption October, week 44, 2008",
-         xaxis = list(title = "Time"),
-         yaxis = list (title = "Power (watt-hours)"))
-
-## Subset the 44th week of 2008 - All Observations (x axis is # of minutes) 
-houseWeek44 <- filter(yrs_primaryDF, year == 2008 & month == 10 & week == 44 & weekdays == "Friday")
-
-plot_ly(houseWeek44, x = ~houseWeek44$DateTime, y = ~houseWeek44$Sub_metering_1, name = 'Kitchen', type = 'scatter', mode = 'lines') %>%
-  add_trace(y = ~houseWeek44$Sub_metering_2, name = 'Laundry Room', mode = 'lines') %>%
-  add_trace(y = ~houseWeek44$Sub_metering_3, name = 'Water Heater & AC', mode = 'lines') %>%
-  layout(title = "Power Consumption Friday, October31st (week 44), 2008",
-         xaxis = list(title = "Time"),
-         yaxis = list (title = "Power (watt-hours)"))
-
-## Subset the 44th week of 2008 - All Observations (x axis is # of minutes)
-houseWeek44 <- filter(yrs_primaryDF, year == 2008 & month == 10 & week == 44 & weekdays == "Wednesday" & (hour == 0 | hour == 4 | hour == 8 | hour == 12 | hour == 16 | hour == 20 | hour == 24 ))
-                                                                                                          
-## Plot sub-meter 1, 2 and 3 with title, legend and labels - shows each day of the week
-plot_ly(houseWeek44, x = ~houseWeek44$DateTime, y = ~houseWeek44$Sub_metering_1, name = 'Kitchen', type = 'scatter', mode = 'lines') %>%
-  add_trace(y = ~houseWeek44$Sub_metering_2, name = 'Laundry Room', mode = 'lines') %>%
-  add_trace(y = ~houseWeek44$Sub_metering_3, name = 'Water Heater & AC', mode = 'lines') %>%
-  layout(title = "Power Consumption Wednesday, October29th (week 44) - every 4 hrs, 2008",
-         xaxis = list(title = "Time"),
-         yaxis = list (title = "Power (watt-hours)"))
-		 
-## Subset the 44th week of 2008 - All Observations (x axis is # of minutes) 
-houseqtrly4 <- filter(yrs_primaryDF, year == 2006 & quarter == 4 & month == 12 & week == 51 & day == 19 & hour == 10)
-
-#houseqtrly4 <- filter(yrs_primaryDF, year == 2007 & quarter == 2 & month == 05 & week == 20 & day == 19 & hour == 10 )
-
-plot_ly(houseqtrly4, x = ~houseqtrly4$DateTime, y = ~houseqtrly4$Sub_metering_1, name = 'Kitchen', type = 'scatter', mode = 'lines') %>%
-  add_trace(y = ~houseqtrly4$Sub_metering_2, name = 'Laundry Room', mode = 'lines') %>%
-  add_trace(y = ~houseqtrly4$Sub_metering_3, name = 'Water Heater & AC', mode = 'lines') %>%
-  layout(title = "Power Consumption, 4th Qtr, Tuesday December 19th, 2006 (10am) ",
-         xaxis = list(title = "Time"),
-         yaxis = list (title = "Power (watt-hours)"))
 		 
 ############################################# SUB-METER 1 ###########################################################
 
@@ -528,7 +459,7 @@ plot(tsSM3_HW070809forC, ylim = c(0, 20), ylab= "Watt-Hours", xlab="Time - Sub-m
 You can also embed plots, for example:
 
 ```{r pressure, echo=FALSE}
-plot(pressure)
+
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
