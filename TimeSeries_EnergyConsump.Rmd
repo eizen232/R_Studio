@@ -1,0 +1,534 @@
+---
+title: "Time_Series_Energy_Consumption"
+author: "Zen"
+date: "June 6, 2019"
+always_allow_html: yes
+output: github_document
+   
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r TimeSeries_EnergryConsump}
+
+library(RMySQL)
+library (dplyr)
+library (tidyverse)
+library (lubridate)
+library (pastecs)
+library (ggplot2)
+library (scales) 
+library(plotly)
+library(ggfortify)
+library(forecast)        #tslm and forecast functions 
+library(timeDate)
+
+## Create a database connection
+con = dbConnect(MySQL(), user='deepAnalytics', password='Sqltask1234!', 
+                dbname='dataanalytics2018', host='data-analytics-2018.cbrosir2cswx.us-east-1.rds.amazonaws.com')
+
+## List the tables contained in the database
+dbListTables(con)
+
+dbListFields(con,'yr_2006')
+yr2006_sel <- dbGetQuery (con, "SELECT Date, Time, Sub_metering_1, Sub_metering_2, Sub_metering_3 FROM yr_2006")     #Dataframe
+#yr2006_sel
+str(yr2006_sel)
+summary(yr2006_sel)
+#head(yr2006_sel)
+#tail(yr2006_sel)
+
+dbListFields(con,'yr_2007')
+yr2007_sel <- dbGetQuery (con, "SELECT Date, Time, Sub_metering_1, Sub_metering_2, Sub_metering_3 FROM yr_2007")     #Dataframe    
+#yr2007_sel
+str(yr2007_sel)
+summary(yr2007_sel)
+#head(yr2007_sel)
+#tail(yr2007_sel)
+
+dbListFields(con,'yr_2008')
+yr2008_sel <- dbGetQuery (con, "SELECT Date, Time, Sub_metering_1, Sub_metering_2, Sub_metering_3 FROM yr_2008")     #Dataframe    
+#yr2008_sel
+str(yr2008_sel)
+summary(yr2008_sel)
+#head(yr2008_sel)
+#tail(yr2008_sel)
+
+dbListFields(con,'yr_2009')
+yr2009_sel <- dbGetQuery (con, "SELECT Date, Time, Sub_metering_1, Sub_metering_2, Sub_metering_3 FROM yr_2009")     #Dataframe    
+#yr2009_sel
+str(yr2009_sel)
+summary(yr2009_sel)
+#head(yr2009_sel)
+#tail(yr2009_sel)
+
+dbListFields(con,'yr_2010')
+yr2010_sel <- dbGetQuery (con, "SELECT Date, Time, Sub_metering_1, Sub_metering_2, Sub_metering_3 FROM yr_2010")     #Dataframe    
+#yr2010_sel
+str(yr2010_sel)
+summary(yr2010_sel)
+#head(yr2010_sel)
+#tail(yr2010_sel)
+
+## Combine tables into one dataframe using dplyr
+yrs_primaryDF <- bind_rows(yr2006_sel, yr2007_sel, yr2008_sel, yr2009_sel, yr2010_sel)
+
+## Combine Date and Time attribute values in a new attribute column
+yrs_primaryDF <-cbind(yrs_primaryDF,paste(yrs_primaryDF$Date,yrs_primaryDF$Time), stringsAsFactors=FALSE)
+
+## Give the new attribute in the 6th column a header name
+## NOTE: if you downloaded more than 5 attributes you will need to change the column number)
+colnames(yrs_primaryDF)[6] <-"DateTime"
+
+## Move the DateTime attribute within the dataset
+yrs_primaryDF <- yrs_primaryDF[,c(ncol(yrs_primaryDF), 1:(ncol(yrs_primaryDF)-1))]
+head(yrs_primaryDF)
+
+
+## Convert DateTime from character to POSIXct 
+yrs_primaryDF$DateTime <- as.POSIXct(yrs_primaryDF$DateTime, "%Y/%m/%d %H:%M:%S")
+
+# Add the time zone
+attr(yrs_primaryDF$DateTime, "tzone") <- "Europe/Paris"
+
+## Inspect the data 
+str(yrs_primaryDF)
+mean (yrs_primaryDF$DateTime)
+mode (yrs_primaryDF$DateTime)
+median(yrs_primaryDF$DateTime)
+range (yrs_primaryDF$DateTime)
+
+## Create "year" attribute with lubridate
+yrs_primaryDF$year <- year(yrs_primaryDF$DateTime)
+
+## Create "quarter" attribute with lubridate
+yrs_primaryDF$quarter <- quarter(yrs_primaryDF$DateTime)
+
+## Create "month" attribute with lubridate
+yrs_primaryDF$month <- month(yrs_primaryDF$DateTime)
+
+## Create "week" attribute with lubridate
+yrs_primaryDF$week <- week(yrs_primaryDF$DateTime)
+
+## Create "weekday" attribute with lubridate
+yrs_primaryDF$weekdays <- weekdays(yrs_primaryDF$DateTime)
+
+#yrs_primaryDF$weekday <- weekday(yrs_primaryDF$DateTime) 
+
+## Create "day" attribute with lubridate
+yrs_primaryDF$day <- day(yrs_primaryDF$DateTime)
+
+## Create "hour" attribute with lubridate
+yrs_primaryDF$hour <- hour(yrs_primaryDF$DateTime)
+
+## Create "minute" attribute with lubridate
+yrs_primaryDF$minute <- minute(yrs_primaryDF$DateTime)
+
+#head(yrs_primaryDF)
+#tail (yrs_primaryDF)
+
+summary (yrs_primaryDF)
+
+#stat.desc (yrs_primaryDF)
+
+#Get avg. of sub-meter 1 for the different years
+meanyr_submtr_1 <- tapply(yrs_primaryDF$Sub_metering_1, yrs_primaryDF$year, mean)
+meanyr_submtr_1
+#Get SD of sub-meter 1 for the different years
+sdyr_submtr_1 <- tapply(yrs_primaryDF$Sub_metering_1, yrs_primaryDF$year, sd)
+sdyr_submtr_1
+
+#Get avg. of sub-meter 2 for the different years
+meanyr_submtr_2 <- tapply(yrs_primaryDF$Sub_metering_2, yrs_primaryDF$year, mean)
+meanyr_submtr_2
+#Get SD of sub-meter 2 for the different years
+sdyr_submtr_2 <- tapply(yrs_primaryDF$Sub_metering_2, yrs_primaryDF$year, sd)
+sdyr_submtr_2
+
+#Get avg. of sub-meter 3 for the different years
+meanyr_submtr_3 <- tapply(yrs_primaryDF$Sub_metering_3, yrs_primaryDF$year, mean)
+meanyr_submtr_3
+#Get SD of sub-meter 3 for the different years
+sdyr_submtr_3 <- tapply(yrs_primaryDF$Sub_metering_3, yrs_primaryDF$year, sd)
+sdyr_submtr_3
+
+#sub-meter 1 grouped by years and x=mnth and y=mtrreading
+by_year <- group_by(yrs_primaryDF, year, quarter, month)
+mtrread <- summarise (by_year, 
+                      count = n(),
+                      mnth = mean(month, na.rm=TRUE),
+                      mtrread = mean(Sub_metering_1, na.rm=TRUE))
+mtrread <- filter (mtrread, count>0)
+                      
+ggplot(mtrread, aes(mnth, mtrread)) +
+  geom_point(aes(size = count), alpha = 1/2) +
+  geom_smooth() +
+  scale_size_area()
+
+  
+#sub-meter 2 grouped by years and x=mnth and y=mtrreading                    
+by_year <- group_by(yrs_primaryDF, year, quarter, month)   #if you ran this in the previous segment no need to run it again
+mtrread2 <- summarise (by_year, 
+                      count = n(),
+                      mnth = mean(month, na.rm=TRUE),
+                      mtrread2 = mean(Sub_metering_2, na.rm=TRUE))
+mtrread2 <- filter (mtrread2, count>0)
+
+ggplot(mtrread2, aes(mnth, mtrread2)) +
+  geom_point(aes(size = count), alpha = 1/2) +
+  geom_smooth() +
+  scale_size_area()  
+
+#sub-meter 3 grouped by years and x=mnth and y=mtrreading                    
+by_year <- group_by(yrs_primaryDF, year, quarter, month)   #if you ran this in the previous segment no need to run it again
+mtrread3 <- summarise (by_year, 
+                       count = n(),
+                       mnth = mean(month, na.rm=TRUE),
+                       mtrread3 = mean(Sub_metering_3, na.rm=TRUE))
+mtrread3 <- filter (mtrread3, count>0)
+
+ggplot(mtrread3, aes(mnth, mtrread3)) +
+  geom_point(aes(size = count), alpha = 1/2) +
+  geom_smooth() +
+  scale_size_area()   
+
+## Subset the second week of 2008 - All Observations (x axis is # of minutes)
+houseWeek <- filter(yrs_primaryDF, year == 2008 & week == 2)
+## Plot subset houseWeek
+plot(houseWeek$Sub_metering_1)
+
+## Subset the fourth month of 2010 - All Observations (x axis is # of minutes)
+housemonth <- filter(yrs_primaryDF, year == 2010 & month == 4)
+## Plot subset houseWeek
+plot(housemonth$Sub_metering_1)
+
+## Subset the 9th day of January 2008 - All observations  (grainy with 1440 points)
+houseDay <- filter(yrs_primaryDF, year == 2008 & month == 1 & day == 9)
+## Plot sub-meter 1
+plot_ly(houseDay, x = ~houseDay$DateTime, y = ~houseDay$Sub_metering_1, type = 'scatter', mode = 'lines')
+
+
+## Plot sub-meter 1, 2 and 3 with title, legend and labels - All observations 
+plot_ly(houseDay, x = ~houseDay$DateTime, y = ~houseDay$Sub_metering_1, name = 'Kitchen', type = 'scatter', mode = 'lines') %>%  
+  add_trace(y = ~houseDay$Sub_metering_2, name = 'Laundry Room', mode = 'lines') %>%
+  add_trace(y = ~houseDay$Sub_metering_3, name = 'Water Heater & AC', mode = 'lines') %>%
+  layout(title = "Power Consumption January 9th, 2008",
+         xaxis = list(title = "Time"),
+         yaxis = list (title = "Power (watt-hours)"))
+
+## Subset the 9th day of January 2008 - 10 Minute frequency  
+houseDay10 <- filter(yrs_primaryDF, year == 2008 & month == 1 & day == 9 & (minute == 0 | minute == 10 | minute == 20 | 
+                                                                              minute == 30 | minute == 40 | minute == 50))
+## Plot sub-meter 1, 2 and 3 with title, legend and labels - 10 Minute frequency
+plot_ly(houseDay10, x = ~houseDay10$DateTime, y = ~houseDay10$Sub_metering_1, name = 'Kitchen', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = ~houseDay10$Sub_metering_2, name = 'Laundry Room', mode = 'lines') %>%
+  add_trace(y = ~houseDay10$Sub_metering_3, name = 'Water Heater & AC', mode = 'lines') %>%
+  layout(title = "Power Consumption January 9th, 2008",
+         xaxis = list(title = "Time"),
+         yaxis = list (title = "Power (watt-hours)"))
+		 
+#Produce the same visualizations as "Day" above but now do it with a week
+
+## Subset the 44th week of 2008 - All Observations (x axis is # of minutes) 
+houseWeek44 <- filter(yrs_primaryDF, year == 2008 & month == 10 & week == 44)
+
+plot_ly(houseWeek44, x = ~houseWeek44$DateTime, y = ~houseWeek44$Sub_metering_1, name = 'Kitchen', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = ~houseWeek44$Sub_metering_2, name = 'Laundry Room', mode = 'lines') %>%
+  add_trace(y = ~houseWeek44$Sub_metering_3, name = 'Water Heater & AC', mode = 'lines') %>%
+  layout(title = "Power Consumption October, week 44, 2008",
+         xaxis = list(title = "Time"),
+         yaxis = list (title = "Power (watt-hours)"))
+
+## Subset the 44th week of 2008 - All Observations (x axis is # of minutes) 
+houseWeek44 <- filter(yrs_primaryDF, year == 2008 & month == 10 & week == 44 & weekdays == "Friday")
+
+plot_ly(houseWeek44, x = ~houseWeek44$DateTime, y = ~houseWeek44$Sub_metering_1, name = 'Kitchen', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = ~houseWeek44$Sub_metering_2, name = 'Laundry Room', mode = 'lines') %>%
+  add_trace(y = ~houseWeek44$Sub_metering_3, name = 'Water Heater & AC', mode = 'lines') %>%
+  layout(title = "Power Consumption Friday, October31st (week 44), 2008",
+         xaxis = list(title = "Time"),
+         yaxis = list (title = "Power (watt-hours)"))
+
+## Subset the 44th week of 2008 - All Observations (x axis is # of minutes)
+houseWeek44 <- filter(yrs_primaryDF, year == 2008 & month == 10 & week == 44 & weekdays == "Wednesday" & (hour == 0 | hour == 4 | hour == 8 | hour == 12 | hour == 16 | hour == 20 | hour == 24 ))
+                                                                                                          
+## Plot sub-meter 1, 2 and 3 with title, legend and labels - shows each day of the week
+plot_ly(houseWeek44, x = ~houseWeek44$DateTime, y = ~houseWeek44$Sub_metering_1, name = 'Kitchen', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = ~houseWeek44$Sub_metering_2, name = 'Laundry Room', mode = 'lines') %>%
+  add_trace(y = ~houseWeek44$Sub_metering_3, name = 'Water Heater & AC', mode = 'lines') %>%
+  layout(title = "Power Consumption Wednesday, October29th (week 44) - every 4 hrs, 2008",
+         xaxis = list(title = "Time"),
+         yaxis = list (title = "Power (watt-hours)"))
+		 
+## Subset the 44th week of 2008 - All Observations (x axis is # of minutes) 
+houseqtrly4 <- filter(yrs_primaryDF, year == 2006 & quarter == 4 & month == 12 & week == 51 & day == 19 & hour == 10)
+
+#houseqtrly4 <- filter(yrs_primaryDF, year == 2007 & quarter == 2 & month == 05 & week == 20 & day == 19 & hour == 10 )
+
+plot_ly(houseqtrly4, x = ~houseqtrly4$DateTime, y = ~houseqtrly4$Sub_metering_1, name = 'Kitchen', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = ~houseqtrly4$Sub_metering_2, name = 'Laundry Room', mode = 'lines') %>%
+  add_trace(y = ~houseqtrly4$Sub_metering_3, name = 'Water Heater & AC', mode = 'lines') %>%
+  layout(title = "Power Consumption, 4th Qtr, Tuesday December 19th, 2006 (10am) ",
+         xaxis = list(title = "Time"),
+         yaxis = list (title = "Power (watt-hours)"))
+		 
+############################################# SUB-METER 1 ###########################################################
+
+
+house070809weekly_2 <- filter(yrs_primaryDF, weekdays == "Tuesday"  & hour == 15 & minute == 30)
+
+## Create TS object with SubMeter1
+tsSM1_070809weekly_2 <- ts(house070809weekly_2$Sub_metering_1, frequency=52, start=c(2007,1))
+tsSM1_070809weekly_2
+
+
+## Plot sub-meter 1 with autoplot - add labels, color
+autoplot(tsSM1_070809weekly_2, ts.colour = 'blue', xlab = "Time", ylab = "Watt Hours", main = "Sub-meter 1")
+
+## Plot sub-meter 1 with plot.ts
+plot.ts(tsSM1_070809weekly_2)
+
+################################# Forecasting  time series ################################################
+
+## Apply time series linear regression to the sub-meter 1 ts object and use summary to obtain R2 and RMSE from the model you built
+fitSM1 <- tslm(tsSM1_070809weekly_2 ~ trend + season)
+summary(fitSM1)
+
+## Create the forecast for sub-meter 1. Forecast ahead 20 time periods/weeks
+forecastfitSM1 <- forecast(fitSM1, h=20)
+## Plot the forecast for sub-meter 2. 
+plot(forecastfitSM1)
+
+
+#change the confidence levels and plot only the forecast portion that is above zero. 
+
+## Create sub-meter 1 forecast with confidence levels 80 and 90
+forecastfitSM1c <- forecast(fitSM1, h=52, level=c(80,90))
+
+## Plot sub-meter 1 forecast, limit y and add labels
+plot(forecastfitSM1c, ylim = c(0, 50), ylab= "Watt-Hours", xlab="Time")
+
+################## Decomposing a time series into 3 components: trend, seasonal and irregular #########
+
+## Decompose Sub-meter 1 into trend, seasonal and remainder
+components070809SM1weekly_2 <- decompose(tsSM1_070809weekly_2)
+
+## Plot decomposed sub-meter 1
+plot(components070809SM1weekly_2)
+
+## Check summary statistics for decomposed sub-meter 1
+summary(components070809SM1weekly_2)
+
+###################### Holt-winters forecasting ###################################
+
+## Seasonal adjusting sub-meter 2 by subtracting the seasonal component & plot
+tsSM1_070809Adjusted <- tsSM1_070809weekly_2 - components070809SM1weekly_2$seasonal
+autoplot(tsSM1_070809Adjusted)
+
+#You really can't tell if seasonality has been removed by looking at the plot above. Decompose again and see if the  seasonal 
+#component was removed. 
+
+## Test Seasonal Adjustment by running Decompose again. Note the very, very small scale for Seasonal
+plot(decompose(tsSM1_070809Adjusted))
+
+#Yes there is a seasonal line, but look at the scale for the seasonal section (in the plot above) -5e-16 through 5e-16.  
+# For all practical purposes the seasonality has been removed.
+
+## Holt Winters Exponential Smoothing & Plot
+tsSM1_HW070809 <- HoltWinters(tsSM1_070809Adjusted, beta=FALSE, gamma=FALSE)
+tsSM1_HW070809
+tsSM1_HW070809$SSE
+plot(tsSM1_HW070809, ylim = c(0, 20))
+
+## HoltWinters forecast & plot  (by default the dark grey and light grey shaded areas are 80% and 95% confid. levels, respectively)
+tsSM1_HW070809for <- forecast(tsSM1_HW070809, h=25)
+tsSM1_HW070809for                              # you can confirm the 80% and 90% confidence level "heading" (or title) here
+plot(tsSM1_HW070809for, ylim = c(0, 20), ylab= "Watt-Hours", xlab="Time - Sub-meter 1", main = "Holt-Winters Forecast")
+
+## Forecast HoltWinters with diminished confidence levels
+tsSM1_HW070809forC <- forecast(tsSM1_HW070809, h=25, level=c(10,25))
+tsSM1_HW070809forC
+## Plot only the forecasted area
+plot(tsSM1_HW070809forC, ylim = c(-5, 5), ylab= "Watt-Hours", xlab="Time - Sub-meter 1", start(2010))
+
+##################################### SUB-METER 2 ###########################################
+
+#
+## Subset to one observation per month on the 22nd at 12:15pm for 2007, 2008, 2009 and 2010
+house070809monthly <- filter(yrs_primaryDF, day == 22  & hour == 12 & minute == 15) 
+#house070809monthly <- filter(yrs_primaryDF, weekdays == "Tuesday" & hour == 12 & minute == 15)
+## Create TS object with SubMeter3
+tsSM2_070809monthly <- ts(house070809monthly$Sub_metering_2, frequency=12, start=c(2007, 1), end=c(2010,11))    
+
+
+## Plot sub-meter 2 with autoplot - add labels, color
+autoplot(tsSM2_070809monthly, ts.colour = 'purple', xlab = "Time", ylab = "Watt Hours", main = "Sub-meter 2")
+
+## Plot sub-meter 2 with plot.ts
+plot.ts(tsSM2_070809monthly)
+
+
+########################## Forecasting a time series ###################################
+
+## Apply time series linear regression to the sub-meter 2 ts object and use summary to obtain R2 and RMSE from the model you built
+fitSM2 <- tslm(tsSM2_070809monthly ~ trend + season)
+summary(fitSM2)
+
+## Create the forecast for sub-meter 2. Forecast ahead 20 time periods/months (from 11/2010 onwards)
+forecastfitSM2 <- forecast(fitSM2, h=20)
+## Plot the forecast for sub-meter 2. 
+plot(forecastfitSM2)
+
+
+#change the confidence levels and plot only the forecast portion that is above zero. 
+
+## Create sub-meter 2 forecast with confidence levels 80 and 90
+forecastfitSM2c <- forecast(fitSM2, h=20, level=c(80, 90))
+
+## Plot sub-meter 2 forecast, limit y and add labels
+plot(forecastfitSM2c, ylim = c(0, 10), ylab= "Watt-Hours", xlab="Time")
+
+############################# Decomposing a time series into 3 components: trend, seasonal and irregular #############
+
+## Decompose Sub-meter 2 into trend, seasonal and remainder
+components070809SM2monthly <- decompose(tsSM2_070809monthly)
+
+## Plot decomposed sub-meter 2
+plot(components070809SM2monthly)
+
+## Check summary statistics for decomposed sub-meter 2
+summary(components070809SM2monthly)
+
+###################### Holt-winters forecasting ###################################
+
+## Seasonal adjusting sub-meter 2 by subtracting the seasonal component & plot
+tsSM2_070809Adjusted <- tsSM2_070809monthly - components070809SM2monthly$seasonal
+autoplot(tsSM2_070809Adjusted)
+
+#You really can't tell if seasonality has been removed by looking at the plot above. Decompose it again and see if the  seasonal 
+#component was removed. 
+
+## Test Seasonal Adjustment by running Decompose again. Note the small scale for Seasonal
+plot(decompose(tsSM2_070809Adjusted))
+
+#Observe the scale for the seasonal section (in the plot above) -0e-15 through 5e-17. 
+#For all practical purposes the seasonality has been removed.
+
+## Holt Winters Exponential Smoothing & Plot
+tsSM2_HW070809 <- HoltWinters(tsSM2_070809Adjusted, beta=FALSE, gamma=FALSE)
+tsSM2_HW070809
+tsSM2_HW070809$SSE
+plot(tsSM2_HW070809, ylim = c(0, 10), main = "Holt-Winters (Simple Exponential Smoothing)" )
+
+## HoltWinters forecast & plot (by default the dark grey and light grey shaded areas are 80% and 95% confid. levels, respectively)
+tsSM2_HW070809for <- forecast(tsSM2_HW070809, h=25)
+tsSM2_HW070809for                                   # you can confirm the 80% and 90% confidence level "heading" (or title) here
+plot(tsSM2_HW070809for, ylim = c(0, 10), ylab= "Watt-Hours", xlab="Time - Sub-meter 2", main="Holt-Winters Forecasting")
+
+      
+## Forecast HoltWinters with diminished confidence levels
+tsSM2_HW070809forC <- forecast(tsSM2_HW070809, h=25, level=c(10,25))
+tsSM2_HW070809forC
+## Plot only the forecasted area
+plot(tsSM2_HW070809forC, ylim = c(0, 5), ylab= "Watt-Hours", xlab="Time - Sub-meter 2", main = "Forecast Holt-Winters (Diminished Confidence Levels)", start(2010))
+
+########################################################## SUB-METER 3 ###################################################
+
+## Subset to one observation per week on Mondays at 8:00pm for 2007, 2008 and 2009
+house070809weekly <- filter(yrs_primaryDF, weekdays == "Monday" & hour == 20 & minute == 1) #since the weekdays attribute is chr need to spell out the weekday "Monday" instead of the number 2
+
+## Create TS object with SubMeter3
+tsSM3_070809weekly <- ts(house070809weekly$Sub_metering_3, frequency=52, start=c(2007,1))
+tsSM3_070809weekly
+
+
+## Plot sub-meter 3 with autoplot - add labels, color
+autoplot(tsSM3_070809weekly, ts.colour = 'red', xlab = "Time", ylab = "Watt Hours", main = "Sub-meter 3")  
+
+## Plot sub-meter 3 with plot.ts
+plot.ts(tsSM3_070809weekly)
+
+
+############################ Forecasting a time series #########################################
+
+## Apply time series linear regression to the sub-meter 3 ts object and use summary to obtain R2 and RMSE from the model you built
+fitSM3 <- tslm(tsSM3_070809weekly ~ trend + season)
+summary(fitSM3)
+
+## Create the forecast for sub-meter 3. Forecast ahead 20 time periods
+forecastfitSM3 <- forecast(fitSM3, h=20)
+## Plot the forecast for sub-meter 3. 
+plot(forecastfitSM3)
+
+#What do the different gray areas represent? Should the forecast really have negative values, or is that an artifact from linear regression? 
+#Lets do one more plot. This time we will add labels, change the confidence levels and plot only the forecast portion that is above zero. 
+
+## Create sub-meter 3 forecast with confidence levels 80 and 90
+forecastfitSM3c <- forecast(fitSM3, h=20, level=c(80,90))
+
+## Plot sub-meter 3 forecast, limit y and add labels
+plot(forecastfitSM3c, ylim = c(0, 20), ylab= "Watt-Hours", xlab="Time")
+
+
+################## Decomposing a time series into 3 components: trend, seasonal and irregular #########
+
+## Decompose Sub-meter 3 into trend, seasonal and remainder
+components070809SM3weekly <- decompose(tsSM3_070809weekly)
+
+## Plot decomposed sub-meter 3
+plot(components070809SM3weekly)
+
+## Check summary statistics for decomposed sub-meter 3
+summary(components070809SM3weekly)
+
+################################################# Holt-winters forecasting ###############################################
+
+## Seasonal adjusting sub-meter 3 by subtracting the seasonal component & plot
+tsSM3_070809Adjusted <- tsSM3_070809weekly - components070809SM3weekly$seasonal
+autoplot(tsSM3_070809Adjusted)
+
+#You really can't tell if seasonality has been removed by looking at the plot above. Decompose again and see if the  seasonal 
+#component was removed. 
+
+## Test Seasonal Adjustment by running Decompose again. Note the very, very small scale for Seasonal
+plot(decompose(tsSM3_070809Adjusted))
+
+# Note the scale for the seasonal section (in the plot above) -1e-15 through 5e-16. 
+# For all practical purposes the seasonality has been removed.
+
+## Holt Winters Simple Exponential Smoothing (SEM) & Plot
+tsSM3_HW070809 <- HoltWinters(tsSM3_070809Adjusted, beta=FALSE, gamma=FALSE)
+tsSM3_HW070809 
+tsSM3_HW070809$SSE
+plot(tsSM3_HW070809, ylim = c(0, 25), main = "Holt-Winters (Simple Exponential Smoothing)")
+
+## HoltWinters forecast & plot  (by default the dark grey and light grey shaded areas are 80% and 95% confid. levels, respectively)
+tsSM3_HW070809for <- forecast(tsSM3_HW070809, h=25)
+tsSM3_HW070809for                                      # you can confirm the 80% and 90% confidence level "heading" (or title) here
+plot(tsSM3_HW070809for, ylim = c(0, 25), ylab= "Watt-Hours", xlab="Time - Sub-meter 3", main = "Holt-winters Forecast")
+
+## Forecast HoltWinters with diminished confidence levels
+tsSM3_HW070809forC <- forecast(tsSM3_HW070809, h=25, level=c(10,25))
+tsSM3_HW070809forC
+## Plot only the forecasted area
+plot(tsSM3_HW070809forC, ylim = c(0, 20), ylab= "Watt-Hours", xlab="Time - Sub-meter 3", main = "Forecast Holt-Winters (Diminished Confidence Levels)", start(2010))
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
