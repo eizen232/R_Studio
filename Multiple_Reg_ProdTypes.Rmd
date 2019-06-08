@@ -1,0 +1,217 @@
+---
+title: "Multiple_Reg_PredAnalytics_Prod_Types"
+author: "Zen"
+date: "June 7, 2019"
+output: 
+  github_document
+#    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r Multiple_Reg_ProdTypes}
+
+
+library(caret)
+library(corrplot)
+set.seed(123) 
+
+existingproductattributes2017 <- read.csv(file = "./existingproductattributes2017.csv", header = TRUE)
+
+summary(existingproductattributes2017)
+attributes(existingproductattributes2017)
+#is.na(existingproductattributes2017)
+str(existingproductattributes2017)
+
+# dummify the data
+
+newDataFrame <- dummyVars(" ~ .", data = existingproductattributes2017)           
+
+readyData <- data.frame(predict(newDataFrame, newdata = existingproductattributes2017))  
+
+#readyData$attributeWithMissingData <- NULL     # deletes any attributes that has missing information (missing data represented by "NA" - substitute "attributeWithMissingData" with the actual column that has missing data) 
+readyData$BestSellersRank <- NULL               #or can also be used to delete highly correlated attributes after identifying those attributes
+
+
+################### Find highly correlated attributes via Correlation Matrix ########################## 
+
+corrData <- cor(readyData)          
+
+corrData
+
+corrplot(corrData)      #strong positive relationship have values closer to 1 and strong negative    relationship will have values closer to -1
+                        #creates a heatmap. Blue color shows positive relationship while red shows negative relationships
+
+findCorrelation(corrData, cutoff = 0.94, verbose = FALSE, names = FALSE, exact = TRUE)   #finds highly correlated (based on your input) paired attributes
+
+
+
+###################################################### Begin Linear Regression Training and Testing ###################################
+
+
+trainSize <- round(nrow(readyData)*0.7)
+testSize <- nrow(readyData)-trainSize
+
+trainSize # number of training set rows based on 70/30 split
+testSize # number of test set rows based on 70/30 split
+
+
+training_indices <- sample(seq_len(nrow(readyData)), size = trainSize)
+trainSet <- readyData[training_indices,]
+testSet <- readyData[-training_indices,]
+
+
+TrainProd <- lm(`Volume`~ ., trainSet)
+
+summary(TrainProd)
+plot (TrainProd)
+
+TestProd <- predict(TrainProd, testSet)
+
+TestProd
+plot (TestProd)
+summary (TestProd)
+
+
+############################################ Begin Random Forest Algorithm ##############################################
+
+
+# define an 75%/25% train/test split of the dataset
+inTrainingRF <- createDataPartition(readyData$Volume, p = .75, list = FALSE)
+trainingRF <- readyData[inTrainingRF,]
+testingRF <- readyData[-inTrainingRF,]
+
+
+#10 fold cross validation
+RFfitControl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)   # repeated cross-validation, 10-fold cross-validation and repeats once
+
+#dataframe for manual tuning of mtry
+rfGrid <- expand.grid(mtry=c(1,2,3))    #will give result for mtry - 1, 2 and 3 rows 
+
+#train RF model with a tuneLength = 2 (use this if you are not using manual tuning with mtry)
+#RFFit1 <- train(Volume~., data = trainingRF, method = "rf", trControl = RFfitControl, tuneLength = 4)
+
+#train Random Forest Regression model  (Use this if you are using manual tuning with mtry)
+#note the system time wrapper. system.time()
+#this is used to measure process execution time 
+system.time(RFFit1 <- train(Volume~., data = trainingRF, method = "rf", trControl=RFfitControl, tuneGrid=rfGrid, importance = T)) 
+
+RFFit1
+summary(RFFit1)
+plot (RFFit1)
+varImp(RFFit1)           # need to add "importance = T" in the Train function (see a few lines above)
+
+
+###  RF 25% split test results
+RFPredictVol <- predict(RFFit1, testingRF) #this is the prediction for the 25% of the CompleteResponses.csv dataset
+summary(RFPredictVol)
+RFPredictVol
+postResample(RFPredictVol, testingRF$Volume)  
+
+
+############################################ Begin SVM Linear 2 Algorithm ##############################################
+
+library(e1071)
+
+
+# define an 75%/25% train/test split of the dataset
+inTrainingSVM <- createDataPartition(readyData$Volume, p = .75, list = FALSE)
+trainingSVM <- readyData[inTrainingSVM,]
+testingSVM <- readyData[-inTrainingSVM,]
+
+#10 fold cross validation
+SVMfitControl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)   # repeated cross-validation, 10-fold cross-validation and repeats once
+
+#train SVM model with a tuneLength = 4
+SVMFit1 <- train(Volume~., data = trainingSVM, method = "svmLinear2", trControl = SVMfitControl, tuneLength = 4)
+
+
+SVMFit1
+summary(SVMFit1)
+plot (SVMFit1)
+varImp(SVMFit1)
+
+
+###  SVM 25% split test results
+SVMPredictVol <- predict(SVMFit1, testingSVM) #this is the prediction for the 25% of the CompleteResponses.csv dataset
+summary(SVMPredictVol)
+SVMPredictVol                            # negative values (meaningless or n/a values) - disqualify this algorithm as a possible contender
+postResample(SVMPredictVol, testingSVM$Volume)  
+
+
+############################################ Begin Gradient Boosting Algorithm ##############################################
+
+library(gbm)
+
+# define an 75%/25% train/test split of the dataset
+inTrainingGB <- createDataPartition(readyData$Volume, p = .75, list = FALSE)
+trainingGB <- readyData[inTrainingGB,]
+testingGB <- readyData[-inTrainingGB,]
+
+
+#10 fold cross validation
+GBfitControl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)   # repeated cross-validation, 10-fold cross-validation and repeats once
+
+#train RF model with a tuneLength = 2
+GBFit1 <- train(Volume~., data = trainingGB, method = "gbm", trControl = GBfitControl, tuneLength = 3)    
+
+
+GBFit1
+summary(GBFit1)
+plot (GBFit1)
+varImp(GBFit1)                       # include the library gbm
+
+
+###  RF 25% split test results
+GBPredictVol <- predict(GBFit1, testingGB) #this is the prediction for the 25% of the CompleteResponses.csv dataset
+summary(GBPredictVol)
+postResample(GBPredictVol, testingGB$Volume)  
+
+
+########################################## Optimal algorithm/model (Random Forest) above and predict on the "newproductsattribute2017" dataset ##########################
+
+## Perform all preprocessing/cleansing that was done previously (on the orig. dataset) on this new predicting dataset
+
+newproductattributes2017 <- read.csv(file = "./newproductattributes2017.csv", header = TRUE)
+
+summary(newproductattributes2017)
+
+
+newDataFrameFinalPred <- dummyVars(" ~ .", data = newproductattributes2017)         
+
+readyDataFinalPred <- data.frame(predict(newDataFrame, newdata = newproductattributes2017))  
+
+                                                          
+readyDataFinalPred$BestSellersRank <- NULL     			# deletes any attributes that has missing information (missing data represented by "NA")           
+readyDataFinalPred										# or can also be used to delete highly correlated attributes after identifying those attributes
+
+#this is the prediction for the "newproductattribute2017" 
+RFFinalPred <- predict(RFFit1, readyDataFinalPred)
+RFFinalPred
+summary(RFFinalPred)
+
+
+output <- newproductattributes2017
+output$predictions <- RFFinalPred               # finalPred
+write.csv(output, file="C2T3output_FinalPred_RF.csv", row.names = TRUE)
+
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
